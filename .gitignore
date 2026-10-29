@@ -3,3 +3,4 @@ var/
 .env
 *.png
 .claude/skills
+preview.html
