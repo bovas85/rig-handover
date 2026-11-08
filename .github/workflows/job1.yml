@@ -1,0 +1,35 @@
+name: Run Job 1 Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_url:
+        description: 'Job 1 MCP URL'
+        required: false
+        default: 'https://hq.mega.dev/mcp/job/v1.eyJzdWIiOiI2MDQiLCJhdWQiOiJqb2I6dHdvLXBsYWNlczpqb2ItMSIsImlhdCI6MTc5NDE3NTEwNCwiZXhwIjoxNzk0MjYxNTA0fQ.GePdJH7tjdw__tXj2alqExtCWDUalXsn28c-rGjlvmo'
+
+jobs:
+  run-job1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Job 1 Worker
+        env:
+          JOB_URL: ${{ github.event.inputs.job_url || 'https://hq.mega.dev/mcp/job/v1.eyJzdWIiOiI2MDQiLCJhdWQiOiJqb2I6dHdvLXBsYWNlczpqb2ItMSIsImlhdCI6MTc5NDE3NTEwNCwiZXhwIjoxNzk0MjYxNTA0fQ.GePdJH7tjdw__tXj2alqExtCWDUalXsn28c-rGjlvmo' }}
+        run: |
+          python scripts/job1_worker.py
+
+      - name: Upload Job 1 Output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: job1-output
+          path: job1_output.json
+          if-no-files-found: ignore
