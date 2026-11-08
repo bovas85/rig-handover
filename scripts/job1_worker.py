@@ -91,7 +91,6 @@ def main():
     entry_id = None
     for e in entries:
         if isinstance(e, dict):
-            # check tram-3 or unit or line
             val_str = json.dumps(e).lower()
             if "tram-3" in val_str or "tram 3" in val_str or "tram_3" in val_str:
                 entry_id = e.get("id")
@@ -116,7 +115,9 @@ def main():
         sys.exit(1)
         
     record = parsed_read if isinstance(parsed_read, dict) else {}
-    if "entry" in record and isinstance(record["entry"], dict):
+    if "fields" in record and isinstance(record["fields"], dict):
+        record = record["fields"]
+    elif "entry" in record and isinstance(record["entry"], dict):
         record = record["entry"]
     elif "record" in record and isinstance(record["record"], dict):
         record = record["record"]
@@ -127,7 +128,6 @@ def main():
         if f in record:
             formatted_lines.append(f"{f}: {record[f]}")
         else:
-            # check case insensitive
             for k, v in record.items():
                 if k.lower() == f.lower():
                     formatted_lines.append(f"{f}: {v}")
@@ -170,7 +170,6 @@ def main():
         result = result or parsed_submit.get("result")
         
     if not receipt and text_content:
-        # Check if receipt is inside text_content
         import re
         m = re.search(r"receipt['\":\s]+([a-zA-Z0-9_\-]+)", text_content)
         if m:
@@ -183,11 +182,11 @@ def main():
     print(f"::FULL_SUBMIT_START::{json.dumps(submit_data)}::FULL_SUBMIT_END::")
     print("==========================================")
     
-    # Write to output file
     with open("job1_output.json", "w") as f:
         json.dump({
             "receipt": receipt,
             "result": result or redacted_text,
+            "raw_record": record,
             "submit_response": submit_data
         }, f, indent=2)
 
