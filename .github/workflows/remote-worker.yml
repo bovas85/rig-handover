@@ -1,0 +1,34 @@
+name: Remote Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_b64:
+        description: 'Base64-encoded JSON task payload'
+        required: true
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Execute Remote Worker Payload
+        env:
+          WORKER_PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        run: |
+          python3 scripts/remote_worker.py
+
+      - name: Upload Worker Output Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-output
+          path: worker_output.json
+          if-no-files-found: ignore
