@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T3 & Antigravity Self-Healing Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0f17; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 0.75rem; }
+    .badge { padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Top Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-5">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="inline-block w-3 h-3 rounded-full bg-emerald-400 animate-pulse" id="live-dot"></span>
+          <h1 class="text-2xl font-bold tracking-tight text-white">T3 & Antigravity Self-Healing Control Center</h1>
+          <span id="mock-badge" class="hidden badge bg-indigo-950 text-indigo-300 border border-indigo-700">MOCK VALIDATION ACTIVE</span>
+        </div>
+        <p class="text-sm text-slate-400 mt-1">
+          Autonomous 10s Watchdog + Root-Cause Prevention Primitives + Axiom Telemetry &bull; Host: <span class="mono text-slate-300" id="host-label">cachyos-x8664</span>
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="runScanAndHeal()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition flex items-center gap-2 shadow">
+          <span>⚡ Scan & Auto-Heal Now</span>
+        </button>
+        <button onclick="refreshAll()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm border border-slate-700 transition">
+          ↻ Refresh
+        </button>
+        <button onclick="promptToken()" class="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs border border-slate-800 transition" title="Change Bearer Token">
+          🔑 Auth
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div id="toast-banner" class="hidden p-4 rounded-xl border text-sm font-medium"></div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="card p-4">
+        <div class="text-xs uppercase tracking-wider text-slate-400">Subshell Trap Auto-Kill</div>
+        <div class="mt-2 flex items-center justify-between">
+          <span class="text-base font-bold text-emerald-400" id="kpi-subshell-heal">AUTO-KILL ON</span>
+          <label class="inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="toggle-subshell-heal" class="sr-only peer" onchange="toggleSubshellHeal(this.checked)" checked>
+            <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all relative peer-checked:bg-emerald-600"></div>
+          </label>
+        </div>
+        <div class="text-xs text-slate-500 mt-1">pts/* interactive bash prompts</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs uppercase tracking-wider text-slate-400">Thread Auto-Interrupt</div>
+        <div class="mt-2 flex items-center justify-between">
+          <span class="text-base font-bold text-sky-400" id="kpi-thread-interrupt">MANUAL ONLY</span>
+          <label class="inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="toggle-thread-interrupt" class="sr-only peer" onchange="toggleThreadInterrupt(this.checked)">
+            <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all relative peer-checked:bg-rose-600"></div>
+          </label>
+        </div>
+        <div class="text-xs text-slate-500 mt-1">Safe: no mid-stream aborts</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs uppercase tracking-wider text-slate-400">Active Runs</div>
+        <div class="text-2xl font-bold text-white mt-2" id="kpi-active-runs">0</div>
+        <div class="text-xs text-slate-500 mt-1">In statev2.sqlite</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs uppercase tracking-wider text-slate-400">Stuck / Anomalies</div>
+        <div class="text-2xl font-bold text-rose-400 mt-2" id="kpi-anomalies">0</div>
+        <div class="text-xs text-slate-500 mt-1" id="kpi-anomalies-sub">All sessions healthy</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs uppercase tracking-wider text-slate-400">Axiom Cloud Sink</div>
+        <div class="text-lg font-bold mt-2 text-emerald-400" id="kpi-axiom">CONNECTED</div>
+        <div class="text-xs text-slate-500 mt-1" id="kpi-axiom-sub">t3-agent-watchdog</div>
+      </div>
+    </div>
+
+    <!-- Active Sessions & Live Diagnostics -->
+    <div class="card p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Active Runs & Live Session Diagnostics</h2>
+          <p class="text-xs text-slate-400">Cross-checks T3 Code SQLite run state against Antigravity brain transcript steps & Linux child PIDs</p>
+        </div>
+        <span class="text-xs mono text-slate-500" id="last-updated-label"></span>
+      </div>
+      <div id="active-runs-container" class="space-y-3">
+        <div class="p-4 rounded-lg bg-slate-900/60 border border-slate-800/80 text-sm text-slate-400 flex items-center justify-between">
+            <span>✅ Zero threads stuck in <code class="mono text-slate-300">running</code> state. All T3 Code sessions are settled.</span>
+          </div>
+      </div>
+    </div>
+
+    <!-- Deterministic Prevention Primitives & Skills -->
+    <div class="card p-5 space-y-3">
+      <div>
+        <h2 class="text-lg font-semibold text-white">Installed Anti-Hang Primitives & Auto-Updated Skills</h2>
+        <p class="text-xs text-slate-400">Whenever the watchdog heals a stuck session, it classifies the root cause and records the prevention rule into <code class="mono text-slate-300">session-hygiene/SKILL.md</code></p>
+      </div>
+      <div id="primitives-container" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+    </div>
+
+    <!-- Two Column Grid: Self-Healing Incident Log + Axiom Cloud Setup & Query -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Self-Healing Event Log -->
+      <div class="card p-5 space-y-4 flex flex-col justify-between">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white">Self-Healing & Root-Cause Event Log</h2>
+              <p class="text-xs text-slate-400">Stored locally in <span class="mono">~/.local/share/t3-watchdog/events.jsonl</span> & mirrored to Axiom</p>
+            </div>
+          </div>
+          <div id="events-container" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+            <div class="text-xs text-slate-500 py-4 text-center">No watchdog events logged yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Axiom Free Tier Integration & APL Console -->
+      <div class="card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-white">Axiom Free Tier Integration & APL Console</h2>
+            <p class="text-xs text-slate-400">Query historical root causes, auto-heals, and scan metrics</p>
+          </div>
+          <a href="https://app.axiom.co" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 underline">Open app.axiom.co ↗</a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="md:col-span-2">
+            <label class="block text-xs text-slate-400 mb-1">Axiom API Token (<code class="mono">xaat-...</code>)</label>
+            <input id="axiom-token" type="password" placeholder="Already configured (paste new xaat-... to rotate)" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-white mono focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Dataset Name</label>
+            <input id="axiom-dataset" type="text" value="t3-agent-watchdog" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-white mono focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button onclick="runAxiomQuery()" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+            📊 Run APL Query on Axiom
+          </button>
+          <button onclick="saveAxiomConfig()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
+            💾 Update Token / Dataset
+          </button>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs text-slate-400">Axiom Processing Language (APL) Query</label>
+          <textarea id="axiom-apl" rows="2" class="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-emerald-300 mono">['t3-agent-watchdog'] | summarize count() by event_type, root_cause_code, severity</textarea>
+          <pre id="axiom-query-output" class="hidden p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs mono text-slate-300 overflow-x-auto max-h-48"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Threads Table -->
+    <div class="card p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Recent T3 Code Threads & Orphaned Task Audit</h2>
+          <p class="text-xs text-slate-400">Shows whether a thread has historical orphaned background tasks in <code class="mono">transcript.jsonl</code> that cause zombie turns</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-slate-800 text-xs uppercase text-slate-400">
+              <th class="py-2.5 pr-4">Thread Title</th>
+              <th class="py-2.5 px-3">Latest Status</th>
+              <th class="py-2.5 px-3">Orphaned Tasks</th>
+              <th class="py-2.5 px-3">Runs (Int / Canc)</th>
+              <th class="py-2.5 px-3">Context Tokens</th>
+              <th class="py-2.5 px-3">Last Updated</th>
+              <th class="py-2.5 pl-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="threads-tbody" class="divide-y divide-slate-800/70">
+              <tr class="hover:bg-slate-900/40">
+                <td class="py-2.5 pr-4 font-medium text-slate-200 max-w-xs truncate" title="Completed Digest Pipeline">
+                  Completed Digest Pipeline
+                  <div class="text-[11px] mono text-slate-500">settled-…</div>
+                </td>
+                <td class="py-2.5 px-3"><span class="badge bg-emerald-950 text-emerald-300 border border-emerald-800">completed</span></td>
+                <td class="py-2.5 px-3"><span class="text-xs text-slate-500">0</span></td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300">3 <span class="text-slate-500">(0 int / 0 canc)</span></td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300">45k / 1000k</td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300" title="16/11/2026, 07:40:00">
+                  <div>27m ago</div>
+                  <div class="text-[10px] text-slate-500">16/11/2026, 07:40:00</div>
+                </td>
+                <td class="py-2.5 pl-3 text-right">
+                  <span class="text-xs text-slate-600">Settled</span>
+                </td>
+              </tr>
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /*__INJECT_TOKEN__*/
+    function cleanToken(t) {
+      if (!t) return "";
+      let s = String(t).trim();
+      while (s.toLowerCase().startsWith("bearer ")) {
+        s = s.slice(7).trim();
+      }
+      return s.replace(/^["']|["']$/g, "").trim();
+    }
+
+    function cleanAndSetToken(t) {
+      const cleaned = cleanToken(t);
+      if (cleaned) {
+        localStorage.setItem("watchdog_token", cleaned);
+        document.cookie = `watchdog_token=${cleaned}; path=/; max-age=31536000; SameSite=Lax`;
+      } else {
+        localStorage.removeItem("watchdog_token");
+      }
+      return cleaned;
+    }
+
+    function getToken() {
+      let tok = localStorage.getItem("watchdog_token") || "";
+      if (!tok) {
+        const m = document.cookie.match(/(?:^|;\s*)watchdog_token=([^;]+)/);
+        if (m) tok = decodeURIComponent(m[1]);
+      }
+      return cleanToken(tok);
+    }
+
+    function promptToken() {
+      const cur = getToken();
+      const entered = prompt("Enter Watchdog API Bearer Token:", cur ? cur.slice(0, 10) + "..." : "");
+      if (entered !== null) {
+        cleanAndSetToken(entered);
+        refreshAll();
+      }
+    }
+
+    function showToast(msg, isError = false) {
+      const b = document.getElementById("toast-banner");
+      if (!b) return;
+      b.className = `p-4 rounded-xl border text-sm font-medium ${isError ? 'bg-rose-950/80 border-rose-800 text-rose-200' : 'bg-emerald-950/80 border-emerald-800 text-emerald-200'}`;
+      b.textContent = msg;
+      b.classList.remove("hidden");
+      setTimeout(() => b.classList.add("hidden"), 4000);
+    }
+
+    async function apiFetch(path, opts = {}, retry = true) {
+      const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+      const tok = getToken();
+      if (tok && !headers["Authorization"]) {
+        headers["Authorization"] = `Bearer ${tok}`;
+      }
+      const res = await fetch(path, { credentials: "same-origin", ...opts, headers });
+      if (res.status === 401 && retry) {
+        const entered = prompt("Authorization required. Please enter your Bearer token:");
+        if (entered) {
+          cleanAndSetToken(entered);
+          return apiFetch(path, opts, false);
+        }
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    function fmtDuration(sec) {
+      if (sec === null || sec === undefined) return "-";
+      const s = Math.round(sec);
+      if (s < 60) return `${s}s`;
+      if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+      return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+    }
+
+    function formatTimeAgo(isoOrTs) {
+      if (!isoOrTs) return "-";
+      const ts = typeof isoOrTs === "number" ? isoOrTs * 1000 : new Date(isoOrTs).getTime();
+      const diffSec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+      if (diffSec < 10) return "just now";
+      if (diffSec < 60) return `${diffSec}s ago`;
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return `${Math.floor(diffSec / 86400)}d ago`;
+    }
+
+    async function refreshAll() {
+      try {
+        const data = await apiFetch("/watchdog/api/status");
+        renderDashboard(data);
+      } catch (e) {
+        console.warn("Watchdog refresh failed:", e);
+      }
+    }
+
+    function renderDashboard(data) {
+      if (!data) return;
+      const snap = data.snapshot || {};
+      const cfg = snap.config || {};
+      const sum = snap.summary || {};
+
+      const mockBadge = document.getElementById("mock-badge");
+      if (mockBadge) {
+        if (snap.is_mock) {
+          mockBadge.classList.remove("hidden");
+        } else {
+          mockBadge.classList.add("hidden");
+        }
+      }
+
+      const updatedLabel = document.getElementById("last-updated-label");
+      if (updatedLabel) updatedLabel.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+
+      // Subshell Trap Auto-Kill KPI & Toggle
+      const subAuto = !!cfg.auto_heal_subshells;
+      const subToggleEl = document.getElementById("toggle-subshell-heal");
+      if (subToggleEl) subToggleEl.checked = subAuto;
+      const subKpiEl = document.getElementById("kpi-subshell-heal");
+      if (subKpiEl) {
+        subKpiEl.textContent = subAuto ? "AUTO-KILL ON" : "MONITOR ONLY";
+        subKpiEl.className = `text-base font-bold ${subAuto ? "text-emerald-400" : "text-amber-400"}`;
+      }
+
+      // Thread Auto-Interrupt KPI & Toggle
+      const threadAuto = !!cfg.auto_interrupt_threads;
+      const threadToggleEl = document.getElementById("toggle-thread-interrupt");
+      if (threadToggleEl) threadToggleEl.checked = threadAuto;
+      const threadKpiEl = document.getElementById("kpi-thread-interrupt");
+      if (threadKpiEl) {
+        threadKpiEl.textContent = threadAuto ? "AUTO-INTERRUPT" : "MANUAL ONLY";
+        threadKpiEl.className = `text-base font-bold ${threadAuto ? "text-rose-400" : "text-sky-400"}`;
+      }
+
+      const activeRunsEl = document.getElementById("kpi-active-runs");
+      if (activeRunsEl) activeRunsEl.textContent = sum.active_runs_count ?? 0;
+
+      const anomCount = sum.anomalies_count ?? 0;
+      const anomEl = document.getElementById("kpi-anomalies");
+      if (anomEl) {
+        anomEl.textContent = anomCount;
+        anomEl.className = `text-2xl font-bold mt-2 ${anomCount > 0 ? "text-rose-400" : "text-emerald-400"}`;
+      }
+      const anomSubEl = document.getElementById("kpi-anomalies-sub");
+      if (anomSubEl) {
+        anomSubEl.textContent = anomCount > 0 ? "Auto-healing in progress" : "All sessions healthy";
+      }
+
+      const axEl = document.getElementById("kpi-axiom");
+      const axSubEl = document.getElementById("kpi-axiom-sub");
+      const axDatasetInput = document.getElementById("axiom-dataset");
+      if (cfg.axiom_configured) {
+        if (axEl) {
+          axEl.textContent = "CONNECTED";
+          axEl.className = "text-lg font-bold mt-2 text-emerald-400";
+        }
+        if (axSubEl) axSubEl.textContent = `Dataset: ${cfg.axiom_dataset}`;
+        if (axDatasetInput) axDatasetInput.value = cfg.axiom_dataset || "t3-agent-watchdog";
+      } else {
+        if (axEl) {
+          axEl.textContent = "LOCAL ONLY";
+          axEl.className = "text-lg font-bold mt-2 text-amber-400";
+        }
+        if (axSubEl) axSubEl.textContent = "Ready for free-tier token";
+      }
+
+      // Render Primitives
+      const primContainer = document.getElementById("primitives-container");
+      if (primContainer) {
+        const prims = snap.primitives || [];
+        primContainer.innerHTML = prims.map(p => `
+          <div class="p-3.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+            <div class="font-semibold text-emerald-300 mono text-xs">${escapeHtml(p.name)}</div>
+            <div class="text-[11px] mono text-slate-400 break-all">${escapeHtml(p.path)}</div>
+            <div class="text-xs text-slate-300 pt-1">${escapeHtml(p.purpose)}</div>
+          </div>
+        `).join("");
+      }
+
+      // Render Active Runs
+      const runsContainer = document.getElementById("active-runs-container");
+      if (runsContainer) {
+        const runs = snap.active_runs || [];
+        if (runs.length === 0) {
+          runsContainer.innerHTML = `<div class="p-4 rounded-lg bg-slate-900/60 border border-slate-800/80 text-sm text-slate-400 flex items-center justify-between">
+            <span>✅ Zero threads stuck in <code class="mono text-slate-300">running</code> state. All T3 Code sessions are settled.</span>
+          </div>`;
+        } else {
+          runsContainer.innerHTML = runs.map(r => {
+            const isHealthy = r.diagnosis === "healthy_running";
+            const bt = r.brain_transcript || {};
+            const rc = r.root_cause;
+            const badgeClass = isHealthy
+              ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+              : "bg-rose-950 text-rose-300 border border-rose-800";
+            return `
+              <div class="p-4 rounded-xl bg-slate-900/90 border ${isHealthy ? 'border-slate-800' : 'border-rose-800/80'} flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="badge ${badgeClass}">${escapeHtml((r.diagnosis || 'RUNNING').toUpperCase())}</span>
+                    <span class="font-semibold text-white">${escapeHtml(r.title || 'Untitled Thread')}</span>
+                    <span class="text-xs mono text-slate-400">(Run #${r.ordinal ?? 1} &bull; ${escapeHtml(r.provider || 'default')})</span>
+                  </div>
+                  <div class="text-xs text-slate-300">${escapeHtml(r.diagnosis_detail || '')}</div>
+                  ${rc ? `<div class="text-xs text-amber-300 mono">Root Cause: [${escapeHtml(rc.root_cause_code || '')}] &rarr; Prevention: ${escapeHtml(rc.prevention_primitive || '')}</div>` : ''}
+                  <div class="text-xs mono text-slate-400">
+                    Run Age: ${fmtDuration(r.run_age_sec)} &bull;
+                    Last Transcript Step: #${bt.last_step_index ?? '?'} (${escapeHtml(bt.last_step_type ?? 'N/A')} / ${escapeHtml(bt.last_step_status ?? 'N/A')}) ${fmtDuration(bt.last_step_age_sec)} ago &bull;
+                    Orphaned Tasks: ${(bt.uncompleted_tasks || []).length}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button onclick="interruptThread('${escapeHtml(r.thread_id || '')}', '${escapeHtml(r.title || '')}')" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition">
+                    🛑 Interrupt & Unstick
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join("");
+        }
+      }
+
+      // Render Recent Events
+      const eventsContainer = document.getElementById("events-container");
+      if (eventsContainer) {
+        const events = data.recent_events || [];
+        if (events.length === 0) {
+          eventsContainer.innerHTML = `<div class="text-xs text-slate-500 py-4 text-center">No watchdog events logged yet.</div>`;
+        } else {
+          eventsContainer.innerHTML = events.map(ev => {
+            const isWarn = ev.severity === "warning" || (ev.event_type && String(ev.event_type).startsWith("healed_"));
+            const timeFormatted = ev._time ? new Date(ev._time).toLocaleTimeString() : "-";
+            const timeAgo = ev._time ? formatTimeAgo(ev._time) : "-";
+            return `
+              <div class="p-3 rounded-lg bg-slate-900/80 border ${isWarn ? 'border-amber-800/60' : 'border-slate-800'} text-xs space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold ${isWarn ? 'text-amber-300' : 'text-emerald-300'} mono">${escapeHtml(ev.event_type || 'event')}${ev.root_cause_code ? ' [' + escapeHtml(ev.root_cause_code) + ']' : ''}</span>
+                  <span class="text-slate-500 mono">${timeFormatted} (${timeAgo})</span>
+                </div>
+                <div class="text-slate-300">${escapeHtml(ev.reason || ev.root_cause_summary || ev.wrapper_cmd || JSON.stringify(ev))}</div>
+                ${ev.prevention_primitive ? `<div class="text-emerald-400 mono text-[11px]">Prevention: ${escapeHtml(ev.prevention_primitive)}</div>` : ''}
+              </div>
+            `;
+          }).join("");
+        }
+      }
+
+      // Render Recent Threads Table
+      const tbody = document.getElementById("threads-tbody");
+      if (tbody) {
+        const threads = snap.recent_threads || [];
+        if (threads.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-xs text-slate-500">No threads found in database.</td></tr>`;
+        } else {
+          tbody.innerHTML = threads.map(t => {
+            const st = t.latest_run_status || "idle";
+            const stBadge = st === "running"
+              ? "bg-amber-950 text-amber-300 border border-amber-800"
+              : st === "completed"
+              ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+              : "bg-slate-800 text-slate-300";
+            const orphans = t.orphaned_tasks_count || 0;
+            const orphanBadge = orphans > 0
+              ? `<span class="badge bg-amber-950/90 text-amber-300 border border-amber-800" title="Orphaned RUNNING task in transcript.jsonl — Watchdog auto-settles turns on this thread">${orphans} orphan(s)</span>`
+              : `<span class="text-xs text-slate-500">0</span>`;
+            const tok = t.context_usage ? `${Math.round(t.context_usage.usedTokens / 1000)}k / ${Math.round(t.context_usage.maxTokens / 1000)}k` : "-";
+            const timeAgo = formatTimeAgo(t.updated_at);
+            const fullDate = t.updated_at ? new Date(t.updated_at).toLocaleString() : "-";
+            const shortTid = (t.thread_id || "").slice(0, 8);
+            return `
+              <tr class="hover:bg-slate-900/40">
+                <td class="py-2.5 pr-4 font-medium text-slate-200 max-w-xs truncate" title="${escapeHtml(t.title || '')}">
+                  ${escapeHtml(t.title || 'Untitled')}
+                  <div class="text-[11px] mono text-slate-500">${escapeHtml(shortTid)}…</div>
+                </td>
+                <td class="py-2.5 px-3"><span class="badge ${stBadge}">${escapeHtml(st)}</span></td>
+                <td class="py-2.5 px-3">${orphanBadge}</td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300">${t.run_count ?? 0} <span class="text-slate-500">(${t.interrupted_count ?? 0} int / ${t.cancelled_count ?? 0} canc)</span></td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300">${tok}</td>
+                <td class="py-2.5 px-3 mono text-xs text-slate-300" title="${escapeHtml(fullDate)}">
+                  <div>${timeAgo}</div>
+                  <div class="text-[10px] text-slate-500">${fullDate}</div>
+                </td>
+                <td class="py-2.5 pl-3 text-right">
+                  ${st === "running" ? `<button onclick="interruptThread('${escapeHtml(t.thread_id || '')}', '${escapeHtml(t.title || '')}')" class="px-2.5 py-1 rounded bg-rose-700 hover:bg-rose-600 text-white text-xs">Interrupt</button>` : `<span class="text-xs text-slate-600">Settled</span>`}
+                </td>
+              </tr>
+            `;
+          }).join("");
+        }
+      }
+    }
+
+    async function runScanAndHeal() {
+      try {
+        const res = await apiFetch("/watchdog/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "scan_and_heal" })
+        });
+        showToast(`Scan & Auto-Heal complete. Actions taken: ${(res.actions_taken || []).length}`);
+        refreshAll();
+      } catch (e) {
+        showToast(`Scan & Auto-Heal failed: ${e.message}`, true);
+      }
+    }
+
+    async function interruptThread(threadId, title) {
+      if (!confirm(`Interrupt and unstick thread "${title}" (${threadId.slice(0, 8)}...)?`)) return;
+      try {
+        const res = await apiFetch("/watchdog/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "interrupt_thread", thread_id: threadId })
+        });
+        showToast(`Interrupt sent to thread ${threadId.slice(0, 8)}`);
+        refreshAll();
+      } catch (e) {
+        showToast(`Interrupt failed: ${e.message}`, true);
+      }
+    }
+
+    async function toggleSubshellHeal(enabled) {
+      try {
+        await apiFetch("/watchdog/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "toggle_subshell_heal", auto_heal_subshells: enabled })
+        });
+        showToast(`Subshell Trap Auto-Kill set to ${enabled ? "ON" : "OFF"}`);
+        refreshAll();
+      } catch (e) {
+        showToast(`Failed updating config: ${e.message}`, true);
+      }
+    }
+
+    async function toggleThreadInterrupt(enabled) {
+      try {
+        await apiFetch("/watchdog/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "toggle_thread_interrupt", auto_interrupt_threads: enabled })
+        });
+        showToast(`Thread Auto-Interrupt set to ${enabled ? "ON (DANGEROUS)" : "OFF (SAFE)"}`);
+        refreshAll();
+      } catch (e) {
+        showToast(`Failed updating config: ${e.message}`, true);
+      }
+    }
+
+    async function saveAxiomConfig() {
+      const token = document.getElementById("axiom-token").value.trim();
+      const dataset = document.getElementById("axiom-dataset").value.trim();
+      try {
+        const body = { action: "save_config", axiom_dataset: dataset };
+        if (token) body.axiom_api_token = token;
+        await apiFetch("/watchdog/api/action", { method: "POST", body: JSON.stringify(body) });
+        showToast("Axiom telemetry config updated");
+        refreshAll();
+      } catch (e) {
+        showToast(`Error configuring Axiom: ${e.message}`, true);
+      }
+    }
+
+    async function runAxiomQuery() {
+      const apl = document.getElementById("axiom-apl").value.trim();
+      const out = document.getElementById("axiom-query-output");
+      out.classList.remove("hidden");
+      out.textContent = "Querying Axiom APL...";
+      try {
+        const res = await apiFetch("/watchdog/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "query_axiom", apl })
+        });
+        out.textContent = JSON.stringify(res, null, 2);
+      } catch (e) {
+        out.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    refreshAll();
+    setInterval(refreshAll, 5000);
+  </script>
+</body>
+</html>
