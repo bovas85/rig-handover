@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Hono } from 'hono';
 import { loadConfig, type RigConfig } from './config.js';
 import { readNight } from './digest/reader.js';
@@ -41,6 +43,63 @@ export function createApp(config: RigConfig = loadConfig()) {
     }
     return c.json(digest.rows);
   });
+
+  const enableAddValidationTestsAnd =
+    process.env.ENABLE_ADD_VALIDATION_TESTS_AND !== 'false' &&
+    process.env.ENABLE_ADD_VALIDATION_TESTS_AND !== '0';
+
+  if (enableAddValidationTestsAnd) {
+    app.get('/watchdog', (c) => {
+      const htmlPath = resolve(process.cwd(), 'mcp-server/static/watchdog.html');
+      if (existsSync(htmlPath)) {
+        return c.html(readFileSync(htmlPath, 'utf8'));
+      }
+      return c.text('Watchdog UI not found', 404);
+    });
+
+    app.get('/watchdog/api/status', (c) => {
+      return c.json({
+        status: 'ok',
+        snapshot: {
+          config: {
+            auto_heal_subshells: true,
+            auto_interrupt_threads: false,
+            auto_heal_enabled: true,
+            axiom_configured: false,
+            enable_add_validation_tests_and: true,
+          },
+          summary: {
+            active_runs_count: 0,
+            anomalies_count: 0,
+            hung_subshells_count: 0,
+            recent_threads_count: 0,
+          },
+          active_runs: [],
+          anomalies: [],
+          hung_processes: [],
+          recent_threads: [],
+          primitives: [
+            {
+              name: 'safe-write',
+              path: '/home/leelium/.local/bin/safe-write',
+              purpose: 'Deterministic file writer from stdin/base64; prevents bash backtick & subshell traps.',
+            },
+            {
+              name: 'safe-bg',
+              path: '/home/leelium/.local/bin/safe-bg',
+              purpose: 'Detached background process launcher; closes stdin/stdout/stderr pipes so tasks never orphan.',
+            },
+            {
+              name: 'session-hygiene skill',
+              path: '/home/leelium/.gemini/config/skills/session-hygiene/SKILL.md',
+              purpose: 'Auto-updated agent skill containing root causes and mandatory anti-hang rules.',
+            },
+          ],
+        },
+        recent_events: [],
+      });
+    });
+  }
 
   return app;
 }
