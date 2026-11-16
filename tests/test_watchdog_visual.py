@@ -41,6 +41,8 @@ class TestWatchdogVisual(unittest.TestCase):
         }
         const document = new Document();
         const localStorage = { getItem: () => '', setItem: () => {}, removeItem: () => {} };
+        const FIXED_NOW = new Date('2026-11-16T08:00:00Z').getTime();
+        Date.now = () => FIXED_NOW;
         """
         # Read the functions from watchdog.html
         script_matches = re.findall(r"<script(?![^>]*src=)[^>]*>(.*?)</script>", self.html_template, re.DOTALL)
