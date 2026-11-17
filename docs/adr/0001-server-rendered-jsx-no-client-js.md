@@ -16,3 +16,8 @@ scripts, no build step for the front end.
 
 - An agent's `fetch` of a page and a human's screenshot match, by construction.
 - Anything interactive is out of scope; if a page needs it, it's the wrong page.
+## Revisit if
+
+- A core requirement demands interactive client state (live filtering, forms, or
+  streaming updates) that cannot be expressed cleanly via server-rendered HTML
+  links and reloadable endpoints.

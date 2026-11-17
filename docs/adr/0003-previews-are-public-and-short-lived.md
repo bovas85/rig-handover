@@ -20,3 +20,7 @@ all. Nobody had cleaned it up, because that was nobody's issue.
 
 - Each plan that ends in a review carries a clean-up step.
 - A link that still shows a lane marker after the plan is done is a bug.
+## Revisit if
+
+- Reviewers gain direct authenticated access to private lane previews, or static
+  HTML preview hosting is replaced by ephemeral authenticated preview tunnels.

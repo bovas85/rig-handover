@@ -20,3 +20,7 @@ top to bottom by a single agent, including the parts that should have waited.
 
 - Anyone, human or agent, picks up a plan cold from the repo alone.
 - The split is the plan's real review. A bad split is a bad plan.
+## Revisit if
+
+- All contributors and autonomous agents share a single always-online issue
+  tracker with native plan-to-issue linking and immutable history.
