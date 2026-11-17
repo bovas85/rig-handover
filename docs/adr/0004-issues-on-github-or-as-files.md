@@ -86,3 +86,7 @@ commit: 4f2a9c1
   `--body-file`.
 - History lives in git: who opened or closed what, and when, is in `git log docs/issues/`.
 - Two trackers for one plan would drift, so rule 3 forbids it.
+## Revisit if
+
+- Every execution lane is guaranteed direct authenticated GitHub API access so
+  the `docs/issues/` file-based fallback is no longer required.

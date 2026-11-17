@@ -1,0 +1,76 @@
+{
+  "generatedFrom": ["src/app.tsx", "mcp-server/tools"],
+  "features": [
+    {
+      "route": "/",
+      "feature": "Status board HTML",
+      "source": "src/app.tsx, src/status.ts, src/views/status.tsx",
+      "reach": "GET /; renders server-side JSX with lane marker banner, last heartbeat from var/heartbeat.json, and nights on disk from runs/.",
+      "actions": [
+        "Inspect lane banner and heartbeat status",
+        "Navigate to /digest/<night>"
+      ],
+      "verify": "node tools/control-rig.mjs request GET / --contains \"<!doctype html>\""
+    },
+    {
+      "route": "/health",
+      "feature": "JSON health & lane endpoint",
+      "source": "src/app.tsx, src/lane.ts",
+      "reach": "GET /health; returns { ok: true, lane: <laneId> }.",
+      "actions": [
+        "Verify service liveness and active lane id"
+      ],
+      "verify": "node tools/control-rig.mjs health --sha HEAD"
+    },
+    {
+      "route": "/digest/:night",
+      "feature": "Morning digest HTML",
+      "source": "src/app.tsx, src/digest/reader.ts, src/views/digest.tsx",
+      "reach": "GET /digest/<YYYY-MM-DD> (e.g. /digest/2026-10-28); reads runs/<night>.jsonl and renders rows or 404.",
+      "actions": [
+        "Inspect night run rows, status, retries, and timestamps"
+      ],
+      "verify": "node tools/control-rig.mjs request GET /digest/2026-10-28 --contains \"2026-10-28\""
+    },
+    {
+      "route": "/api/digest/:night",
+      "feature": "Morning digest JSON API",
+      "source": "src/app.tsx, src/digest/reader.ts",
+      "reach": "GET /api/digest/<YYYY-MM-DD> (e.g. /api/digest/2026-10-28); returns parsed JSON rows or 404 JSON error.",
+      "actions": [
+        "Fetch structured night digest rows"
+      ],
+      "verify": "node tools/control-rig.mjs request GET /api/digest/2026-10-28 --contains \"lastStatus\""
+    },
+    {
+      "route": "/watchdog",
+      "feature": "Watchdog control center HTML",
+      "source": "src/app.tsx, mcp-server/static/watchdog.html",
+      "reach": "GET /watchdog (enabled unless ENABLE_ADD_VALIDATION_TESTS_AND is false/0); serves static watchdog control center HTML.",
+      "actions": [
+        "Inspect session watchdog UI shell"
+      ],
+      "verify": "node tools/control-rig.mjs request GET /watchdog --contains \"T3 & Antigravity Self-Healing Control Center\""
+    },
+    {
+      "route": "/watchdog/api/status",
+      "feature": "Watchdog status JSON snapshot",
+      "source": "src/app.tsx",
+      "reach": "GET /watchdog/api/status (enabled unless ENABLE_ADD_VALIDATION_TESTS_AND is false/0); returns watchdog snapshot and prevention primitives.",
+      "actions": [
+        "Inspect active runs, anomalies, and anti-hang primitives"
+      ],
+      "verify": "node tools/control-rig.mjs request GET /watchdog/api/status --contains \"safe-write\""
+    },
+    {
+      "route": "mcp:watchdog",
+      "feature": "Python MCP session watchdog tool",
+      "source": "mcp-server/tools/watchdog.py",
+      "reach": "Invoked offline via run_watchdog_mcp_tool({ action }) supporting status, scan_and_heal, interrupt_thread, and query_axiom.",
+      "actions": [
+        "Run deterministic offline snapshot & root-cause classification smoke test"
+      ],
+      "verify": "node tools/control-rig.mjs execute"
+    }
+  ]
+}
