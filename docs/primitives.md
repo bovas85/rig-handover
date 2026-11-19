@@ -58,8 +58,9 @@ list in the same PR.
   `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/`,
   `.github/scripts/issue-triage.cjs`, `.github/workflows/`
 - **Role:** Splits `plan.md` into GitHub issues (or `docs/issues/` fallback),
-  triages `P0`–`P3` and `needs-human`, runs scheduled maintenance via
-  `reusable-gemini-maintenance.yml`, and enforces branch + human merge rules.
+  triages `P0`–`P3` and `needs-human`, files zero-cost CI failure issues via
+  `errors-to-issues.yml` (with local T3/Antigravity scheduled maintenance),
+  and enforces branch + human merge rules.
 - **adrs:**
   - [`docs/adr/0002-plans-are-files-work-is-issues.md`](adr/0002-plans-are-files-work-is-issues.md)
   - [`docs/adr/0004-issues-on-github-or-as-files.md`](adr/0004-issues-on-github-or-as-files.md)
