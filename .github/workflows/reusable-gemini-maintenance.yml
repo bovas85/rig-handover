@@ -46,7 +46,12 @@ on:
         description: "Gemini model name"
         required: false
         type: string
-        default: "gemini-2.5-flash"
+        default: "gemini-3.8-flash"
+      pnpm_version:
+        description: "Fallback pnpm version when package.json does not specify packageManager"
+        required: false
+        type: string
+        default: "10"
     secrets:
       GEMINI_CLI_LLM:
         required: false
@@ -81,11 +86,22 @@ jobs:
               exit 0
             fi
           fi
+          HAS_PKG_MGR="false"
+          if [ -f package.json ] && grep -q '"packageManager"' package.json; then
+            HAS_PKG_MGR="true"
+          fi
+          echo "pnpm_has_pkg_manager=$HAS_PKG_MGR" >> "$GITHUB_OUTPUT"
           echo "enabled=true" >> "$GITHUB_OUTPUT"
 
-      - name: Setup pnpm
-        if: steps.guard.outputs.enabled == 'true' && inputs.setup_runtime == 'node' && inputs.package_manager == 'pnpm'
+      - name: Setup pnpm (from packageManager)
+        if: steps.guard.outputs.enabled == 'true' && inputs.setup_runtime == 'node' && inputs.package_manager == 'pnpm' && steps.guard.outputs.pnpm_has_pkg_manager == 'true'
         uses: pnpm/action-setup@v4
+
+      - name: Setup pnpm (default version)
+        if: steps.guard.outputs.enabled == 'true' && inputs.setup_runtime == 'node' && inputs.package_manager == 'pnpm' && steps.guard.outputs.pnpm_has_pkg_manager != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm_version }}
 
       - name: Setup Node
         if: steps.guard.outputs.enabled == 'true' && inputs.setup_runtime == 'node'
@@ -182,7 +198,7 @@ jobs:
           settings: |
             {
               "model": {
-                "maxSessionTurns": 30
+                "maxSessionTurns": 60
               }
             }
           prompt: ${{ steps.prompt.outputs.BODY }}
