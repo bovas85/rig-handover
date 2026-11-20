@@ -25,5 +25,5 @@ or CI verification.
 When a temporary rollout flag (such as `ENABLE_ADD_VALIDATION_TESTS_AND`) meets
 its removal condition, file a `chore(cleanup):` issue using
 [`.github/ISSUE_TEMPLATE/cleanup.yml`](../.github/ISSUE_TEMPLATE/cleanup.yml)
-with **Ready when** and **How to verify** sections so `legacy-reaper` can
-remove the flag and fallback branch cleanly.
+with **Ready when** and **How to verify** sections so local T3/Antigravity
+scheduled maintenance can remove the flag and fallback branch cleanly.
