@@ -142,13 +142,34 @@ export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) 
   const client = new Client({ apiKey });
   const startTime = new Date(Date.now() - sinceHours * 3600 * 1000);
 
+  let projectIds;
+  try {
+    const projectObj = await client.readProject({ projectName: project });
+    if (projectObj?.id) {
+      projectIds = [projectObj.id];
+    }
+  } catch (err) {
+    if (err?.status === 404 || err?.message?.includes('not found')) {
+      console.log(`[telemetry-friction] Project '${project}' does not exist or has no runs.`);
+      return [];
+    }
+    console.error(`[telemetry-friction] Failed to resolve project '${project}': ${err.message}`);
+    return [];
+  }
+
+  if (!projectIds || projectIds.length === 0) {
+    console.log(`[telemetry-friction] Could not resolve project UUID for '${project}'.`);
+    return [];
+  }
+
   const runs = [];
   try {
-    for await (const run of client.listRuns({
-      projectName: project,
-      error: true,
-      startTime,
-      limit,
+    for await (const run of client.runs.query({
+      project_ids: projectIds,
+      has_error: true,
+      min_start_time: startTime.toISOString(),
+      page_size: limit,
+      selects: ['ID', 'NAME', 'RUN_TYPE', 'STATUS', 'START_TIME', 'INPUTS', 'OUTPUTS', 'ERROR', 'EXTRA'],
     })) {
       runs.push(run);
     }
