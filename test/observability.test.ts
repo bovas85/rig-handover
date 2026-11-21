@@ -7,6 +7,7 @@ import {
   formatErrorSummary,
   loadState,
   parseArgs,
+  resolveCreateIssueScript,
   runHarvest,
   saveState,
 } from '../tools/harvest-telemetry-friction.mjs';
@@ -39,11 +40,23 @@ describe('Telemetry Friction Harvester', () => {
   let tmpDir: string;
   let tmpStateFile: string;
   let tmpMockFile: string;
+  let mockCreateIssueScript: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'friction-test-'));
     tmpStateFile = path.join(tmpDir, 'state.json');
     tmpMockFile = path.join(tmpDir, 'mock-runs.json');
+    mockCreateIssueScript = path.join(tmpDir, 'mock-create-issue.mjs');
+
+    // Create a hermetic mock of create-issue.mjs for CI environments
+    fs.writeFileSync(
+      mockCreateIssueScript,
+      `#!/usr/bin/env node
+console.log("[DRY-RUN] Mock create-issue.mjs executed successfully with args:", process.argv.slice(2));
+process.exit(0);
+`,
+      'utf8'
+    );
   });
 
   afterEach(() => {
@@ -62,6 +75,10 @@ describe('Telemetry Friction Harvester', () => {
     expect(formatErrorSummary('Error: Connection timed out\n  at socket.js:10')).toBe('Error: Connection timed out');
     expect(formatErrorSummary({ message: 'Validation failed' })).toBe('Validation failed');
     expect(formatErrorSummary(null)).toBe('Unknown error occurred in run');
+  });
+
+  it('resolves create-issue script from custom path or defaults', () => {
+    expect(resolveCreateIssueScript(mockCreateIssueScript)).toBe(mockCreateIssueScript);
   });
 
   it('loads and saves deduplication state', () => {
@@ -88,12 +105,13 @@ describe('Telemetry Friction Harvester', () => {
       'utf8'
     );
 
-    // First harvest: should process the run
+    // First harvest: should process the run using hermetic mock script
     const res1 = await runHarvest({
       mockFile: tmpMockFile,
       stateFile: tmpStateFile,
       dryRun: true,
       repo: 'bovas85/rig-handover',
+      createIssueScript: mockCreateIssueScript,
     });
 
     expect(res1.ok).toBe(true);
@@ -106,10 +124,36 @@ describe('Telemetry Friction Harvester', () => {
       stateFile: tmpStateFile,
       dryRun: true,
       repo: 'bovas85/rig-handover',
+      createIssueScript: mockCreateIssueScript,
     });
 
     expect(res2.ok).toBe(true);
     expect(res2.filedCount).toBe(0);
     expect(res2.totalSeen).toBe(1);
+  });
+
+  it('falls back to simulated dry-run if create-issue script is absent', async () => {
+    fs.writeFileSync(
+      tmpMockFile,
+      JSON.stringify([
+        {
+          id: 'test-run-missing-script-1',
+          name: 'missing-script-step',
+          error: 'SimulatedError: Script not found on disk',
+        },
+      ]),
+      'utf8'
+    );
+
+    const res = await runHarvest({
+      mockFile: tmpMockFile,
+      stateFile: tmpStateFile,
+      dryRun: true,
+      repo: 'bovas85/rig-handover',
+      createIssueScript: '/nonexistent/path/to/create-issue.mjs',
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.filedCount).toBe(1);
   });
 });

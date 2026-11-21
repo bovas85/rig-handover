@@ -6,6 +6,7 @@ export interface HarvestArgs {
   repo: string;
   stateFile: string;
   mockFile: string | null;
+  createIssueScript?: string | null;
 }
 
 export interface HarvestState {
@@ -13,6 +14,7 @@ export interface HarvestState {
   last_harvest: string | null;
 }
 
+export function resolveCreateIssueScript(customPath?: string | null): string | null;
 export function parseArgs(argv?: string[]): HarvestArgs;
 export function loadState(stateFilePath: string): HarvestState;
 export function saveState(stateFilePath: string, state: HarvestState): void;
@@ -27,6 +29,7 @@ export function reportFrictionIssue(options: {
   run: any;
   repo: string;
   dryRun?: boolean;
+  createIssueScript?: string | null;
 }): boolean;
 export function runHarvest(options?: Partial<HarvestArgs>): Promise<{
   ok: boolean;

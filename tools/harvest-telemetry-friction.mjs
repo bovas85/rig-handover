@@ -17,15 +17,34 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_STATE_DIR = path.join(os.homedir(), '.local', 'share', 'telemetry-friction');
 const DEFAULT_STATE_FILE = path.join(DEFAULT_STATE_DIR, 'state.json');
-const CREATE_ISSUE_SCRIPT = path.join(
-  os.homedir(),
-  '.gemini',
-  'config',
-  'skills',
-  'github-issue-creator',
-  'scripts',
-  'create-issue.mjs'
-);
+
+export function resolveCreateIssueScript(customPath = null) {
+  const candidates = [
+    customPath,
+    process.env.CREATE_ISSUE_SCRIPT,
+    path.join(os.homedir(), '.gemini', 'config', 'skills', 'github-issue-creator', 'scripts', 'create-issue.mjs'),
+    path.join(
+      os.homedir(),
+      '.t3',
+      'userdata',
+      'providers',
+      'antigravity',
+      'ac0a3dfd6dddb20962cecff6ee5fe65e19d3923be20e52c5ab52ff877f7e4c32',
+      'config',
+      'skills',
+      'github-issue-creator',
+      'scripts',
+      'create-issue.mjs'
+    ),
+  ].filter(Boolean);
+
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      return c;
+    }
+  }
+  return candidates[0] || null;
+}
 
 export function parseArgs(argv = process.argv.slice(2)) {
   const args = {
@@ -36,6 +55,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     repo: 'bovas85/rig-handover',
     stateFile: DEFAULT_STATE_FILE,
     mockFile: null,
+    createIssueScript: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -54,6 +74,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
       args.stateFile = argv[++i];
     } else if (arg === '--mock-file' && i + 1 < argv.length) {
       args.mockFile = argv[++i];
+    } else if (arg === '--create-issue-script' && i + 1 < argv.length) {
+      args.createIssueScript = argv[++i];
     }
   }
 
@@ -137,7 +159,7 @@ export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) 
   return runs;
 }
 
-export function reportFrictionIssue({ run, repo, dryRun }) {
+export function reportFrictionIssue({ run, repo, dryRun, createIssueScript }) {
   const runId = run.id || `mock-${Date.now()}`;
   const runName = run.name || 'agent-run';
   const errSummary = formatErrorSummary(run.error);
@@ -156,8 +178,21 @@ export function reportFrictionIssue({ run, repo, dryRun }) {
   const whatHappened = `Run '${runName}' encountered an unhandled error: ${errSummary}`;
   const wanted = `Handle this failure cleanly without crashing or hanging, ensuring graceful error recovery.`;
 
+  const scriptPath = resolveCreateIssueScript(createIssueScript);
+
+  if (!scriptPath || !fs.existsSync(scriptPath)) {
+    if (dryRun) {
+      console.log(
+        `[telemetry-friction] (Simulated Dry-Run) create-issue.mjs not found at ${scriptPath}. Simulating dry-run issue creation for run ${runId} on ${repo}.`
+      );
+      return true;
+    }
+    console.error(`[telemetry-friction] Error: create-issue.mjs not found at ${scriptPath}`);
+    return false;
+  }
+
   const args = [
-    CREATE_ISSUE_SCRIPT,
+    scriptPath,
     '--repo', repo,
     '--type', 'friction',
     '--title', title,
@@ -208,7 +243,12 @@ export async function runHarvest(options = {}) {
     }
 
     const targetRepo = run.extra?.metadata?.repo || opts.repo;
-    const ok = reportFrictionIssue({ run, repo: targetRepo, dryRun: opts.dryRun });
+    const ok = reportFrictionIssue({
+      run,
+      repo: targetRepo,
+      dryRun: opts.dryRun,
+      createIssueScript: opts.createIssueScript,
+    });
     if (ok) {
       filedCount++;
       if (runId && !state.seen_run_ids.includes(runId)) {
