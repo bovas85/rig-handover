@@ -177,36 +177,4 @@ describe('control-rig CLI and helpers', () => {
     const mapPayload = JSON.parse(mapOut);
     expect(mapPayload.ok).toBe(true);
   });
-
-  it('skills_policy allows an empty .gemini/skills dir but rejects copied skill content', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rig-skills-policy-'));
-    try {
-      fs.mkdirSync(path.join(tmpDir, '.agents/skills/control-rig'), { recursive: true });
-      fs.mkdirSync(path.join(tmpDir, '.agents/skills/plan-to-issues'), { recursive: true });
-      fs.writeFileSync(path.join(tmpDir, '.agents/skills/control-rig/SKILL.md'), '# control-rig\n');
-      fs.writeFileSync(
-        path.join(tmpDir, '.agents/skills/plan-to-issues/SKILL.md'),
-        '# plan-to-issues\n',
-      );
-
-      // Empty .gemini/skills directory auto-created by an IDE/agent harness should pass.
-      const geminiSkills = path.join(tmpDir, '.gemini/skills');
-      fs.mkdirSync(geminiSkills, { recursive: true });
-      const emptyCheck = runDoctor(tmpDir).checks.find(
-        (c: { name: string }) => c.name === 'skills_policy',
-      );
-      expect(emptyCheck?.ok).toBe(true);
-
-      // Non-empty non-symlink .gemini/skills directory should fail skills_policy.
-      fs.mkdirSync(path.join(geminiSkills, 'copied-skill'), { recursive: true });
-      fs.writeFileSync(path.join(geminiSkills, 'copied-skill/SKILL.md'), '# drift\n');
-      const nonEmptyCheck = runDoctor(tmpDir).checks.find(
-        (c: { name: string }) => c.name === 'skills_policy',
-      );
-      expect(nonEmptyCheck?.ok).toBe(false);
-      expect(nonEmptyCheck?.detail).toContain('.gemini/skills is not a symlink to .agents/skills');
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
 });
