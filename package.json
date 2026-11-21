@@ -14,11 +14,14 @@
     "typecheck": "tsc --noEmit",
     "lint:all": "tsc --noEmit",
     "verify": "tsc --noEmit && python3 -m py_compile mcp-server/config.py mcp-server/tools/watchdog.py scripts/remote_worker.py && pnpm test && node tools/control-rig.mjs map --check",
-    "control-rig": "node tools/control-rig.mjs"
+    "control-rig": "node tools/control-rig.mjs",
+    "harvest:telemetry": "node tools/harvest-telemetry-friction.mjs"
   },
   "dependencies": {
+    "@google/genai": "^3.6.1",
     "@hono/node-server": "^1.19.0",
-    "hono": "^4.13.8"
+    "hono": "^4.13.8",
+    "langsmith": "^0.13.1"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

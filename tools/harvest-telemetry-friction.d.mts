@@ -1,0 +1,35 @@
+export interface HarvestArgs {
+  dryRun: boolean;
+  limit: number;
+  sinceHours: number;
+  project: string;
+  repo: string;
+  stateFile: string;
+  mockFile: string | null;
+}
+
+export interface HarvestState {
+  seen_run_ids: string[];
+  last_harvest: string | null;
+}
+
+export function parseArgs(argv?: string[]): HarvestArgs;
+export function loadState(stateFilePath: string): HarvestState;
+export function saveState(stateFilePath: string, state: HarvestState): void;
+export function formatErrorSummary(rawError: unknown): string;
+export function fetchFailedRuns(options: {
+  project?: string;
+  limit?: number;
+  sinceHours?: number;
+  mockFile?: string | null;
+}): Promise<any[]>;
+export function reportFrictionIssue(options: {
+  run: any;
+  repo: string;
+  dryRun?: boolean;
+}): boolean;
+export function runHarvest(options?: Partial<HarvestArgs>): Promise<{
+  ok: boolean;
+  filedCount: number;
+  totalSeen: number;
+}>;
