@@ -275,7 +275,11 @@ export function runDoctor(rootDir = ROOT_DIR, flags = {}) {
     if (fs.existsSync(p)) {
       const stat = fs.lstatSync(p);
       if (!stat.isSymbolicLink()) {
-        mirrorIssues.push(`${rel} is not a symlink to .agents/skills`);
+        // Ignore empty directories auto-created by IDE/agent harnesses; flag copied content or files.
+        const isEmptyDir = stat.isDirectory() && fs.readdirSync(p).length === 0;
+        if (!isEmptyDir) {
+          mirrorIssues.push(`${rel} is not a symlink to .agents/skills`);
+        }
       }
     }
   }
