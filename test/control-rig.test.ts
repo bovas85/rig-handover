@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import type { AddressInfo } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { serve } from '@hono/node-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -64,6 +66,45 @@ describe('control-rig CLI and helpers', () => {
         'feature_map',
       ]),
     );
+  });
+
+  it('doctor skills_policy allows empty .gemini/skills and .claude/skills but fails when non-empty', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rig-skills-policy-'));
+    try {
+      fs.mkdirSync(path.join(tmpRoot, '.agents/skills/control-rig'), { recursive: true });
+      fs.mkdirSync(path.join(tmpRoot, '.agents/skills/plan-to-issues'), { recursive: true });
+      fs.writeFileSync(path.join(tmpRoot, '.agents/skills/control-rig/SKILL.md'), '# control-rig\n');
+      fs.writeFileSync(
+        path.join(tmpRoot, '.agents/skills/plan-to-issues/SKILL.md'),
+        '# plan-to-issues\n',
+      );
+
+      // Empty auto-created harness directories should be allowed
+      fs.mkdirSync(path.join(tmpRoot, '.gemini/skills'), { recursive: true });
+      fs.mkdirSync(path.join(tmpRoot, '.claude/skills'), { recursive: true });
+
+      const emptyResult = runDoctor(tmpRoot);
+      const emptyCheck = emptyResult.checks.find(
+        (c: { name: string }) => c.name === 'skills_policy',
+      );
+      expect(emptyCheck?.ok).toBe(true);
+
+      // Non-empty non-symlink .gemini/skills should fail skills_policy
+      fs.mkdirSync(path.join(tmpRoot, '.gemini/skills/copied-skill'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpRoot, '.gemini/skills/copied-skill/SKILL.md'),
+        '# copied\n',
+      );
+
+      const nonEmptyResult = runDoctor(tmpRoot);
+      const nonEmptyCheck = nonEmptyResult.checks.find(
+        (c: { name: string }) => c.name === 'skills_policy',
+      );
+      expect(nonEmptyCheck?.ok).toBe(false);
+      expect(nonEmptyCheck?.detail).toContain('.gemini/skills is not a symlink to .agents/skills');
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
   });
 
   it('map --check validates Hono SSR routes and mcp-server/tools/ against features.json', () => {
