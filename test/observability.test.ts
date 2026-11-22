@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { GoogleGenAI } from '@google/genai';
+import { isTraceableFunction } from 'langsmith/traceable';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getTracedGemini } from '../src/observability/gemini.js';
 import {
@@ -13,26 +15,48 @@ import {
 } from '../tools/harvest-telemetry-friction.mjs';
 
 describe('Observability & Gemini Wrapper', () => {
-  it('creates a raw GoogleGenAI client when tracing is disabled', () => {
+  const originalTracing = process.env.LANGSMITH_TRACING;
+
+  afterEach(() => {
+    if (originalTracing === undefined) {
+      delete process.env.LANGSMITH_TRACING;
+    } else {
+      process.env.LANGSMITH_TRACING = originalTracing;
+    }
+  });
+
+  it('returns an unwrapped GoogleGenAI client when tracing is disabled, overriding env', () => {
+    process.env.LANGSMITH_TRACING = 'true';
     const client = getTracedGemini({
       apiKey: 'test-key',
       tracingEnabled: false,
     });
-    expect(client).toBeDefined();
-    expect(client.models).toBeDefined();
-    expect(typeof client.models.generateContent).toBe('function');
+    expect(client).toBeInstanceOf(GoogleGenAI);
+    expect(isTraceableFunction(client.models.generateContent)).toBe(false);
+    expect(isTraceableFunction(client.models.generateContentStream)).toBe(false);
   });
 
-  it('wraps GoogleGenAI client when tracing is enabled', () => {
+  it('wraps GoogleGenAI model methods with LangSmith tracing when enabled', () => {
+    delete process.env.LANGSMITH_TRACING;
     const client = getTracedGemini({
       apiKey: 'test-key',
       tracingEnabled: true,
       tags: ['unit-test'],
       metadata: { env: 'test' },
     });
-    expect(client).toBeDefined();
-    expect(client.models).toBeDefined();
-    expect(typeof client.models.generateContent).toBe('function');
+    expect(client).not.toBeInstanceOf(GoogleGenAI);
+    expect(isTraceableFunction(client.models.generateContent)).toBe(true);
+    expect(isTraceableFunction(client.models.generateContentStream)).toBe(true);
+  });
+
+  it('reads LANGSMITH_TRACING env var when tracingEnabled is omitted', () => {
+    delete process.env.LANGSMITH_TRACING;
+    const disabledClient = getTracedGemini({ apiKey: 'test-key' });
+    expect(isTraceableFunction(disabledClient.models.generateContent)).toBe(false);
+
+    process.env.LANGSMITH_TRACING = '1';
+    const enabledClient = getTracedGemini({ apiKey: 'test-key' });
+    expect(isTraceableFunction(enabledClient.models.generateContent)).toBe(true);
   });
 });
 
