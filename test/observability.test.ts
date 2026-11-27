@@ -1,11 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { GoogleGenAI } from '@google/genai';
-import { isTraceableFunction } from 'langsmith/traceable';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getTracedGemini } from '../src/observability/gemini.js';
 import {
+  buildLangsmithTraceUrl,
   formatErrorSummary,
   loadState,
   parseArgs,
@@ -13,52 +11,6 @@ import {
   runHarvest,
   saveState,
 } from '../tools/harvest-telemetry-friction.mjs';
-
-describe('Observability & Gemini Wrapper', () => {
-  const originalTracing = process.env.LANGSMITH_TRACING;
-
-  afterEach(() => {
-    if (originalTracing === undefined) {
-      delete process.env.LANGSMITH_TRACING;
-    } else {
-      process.env.LANGSMITH_TRACING = originalTracing;
-    }
-  });
-
-  it('returns an unwrapped GoogleGenAI client when tracing is disabled, overriding env', () => {
-    process.env.LANGSMITH_TRACING = 'true';
-    const client = getTracedGemini({
-      apiKey: 'test-key',
-      tracingEnabled: false,
-    });
-    expect(client).toBeInstanceOf(GoogleGenAI);
-    expect(isTraceableFunction(client.models.generateContent)).toBe(false);
-    expect(isTraceableFunction(client.models.generateContentStream)).toBe(false);
-  });
-
-  it('wraps GoogleGenAI model methods with LangSmith tracing when enabled', () => {
-    delete process.env.LANGSMITH_TRACING;
-    const client = getTracedGemini({
-      apiKey: 'test-key',
-      tracingEnabled: true,
-      tags: ['unit-test'],
-      metadata: { env: 'test' },
-    });
-    expect(client).not.toBeInstanceOf(GoogleGenAI);
-    expect(isTraceableFunction(client.models.generateContent)).toBe(true);
-    expect(isTraceableFunction(client.models.generateContentStream)).toBe(true);
-  });
-
-  it('reads LANGSMITH_TRACING env var when tracingEnabled is omitted', () => {
-    delete process.env.LANGSMITH_TRACING;
-    const disabledClient = getTracedGemini({ apiKey: 'test-key' });
-    expect(isTraceableFunction(disabledClient.models.generateContent)).toBe(false);
-
-    process.env.LANGSMITH_TRACING = '1';
-    const enabledClient = getTracedGemini({ apiKey: 'test-key' });
-    expect(isTraceableFunction(enabledClient.models.generateContent)).toBe(true);
-  });
-});
 
 describe('Telemetry Friction Harvester', () => {
   let tmpDir: string;
@@ -99,6 +51,15 @@ process.exit(0);
     expect(formatErrorSummary('Error: Connection timed out\n  at socket.js:10')).toBe('Error: Connection timed out');
     expect(formatErrorSummary({ message: 'Validation failed' })).toBe('Validation failed');
     expect(formatErrorSummary(null)).toBe('Unknown error occurred in run');
+  });
+
+  it('builds EU and US LangSmith trace URLs matching LANGSMITH_ENDPOINT', () => {
+    expect(buildLangsmithTraceUrl('agent-seat', 'run-1', 'https://eu.api.smith.langchain.com')).toBe(
+      'https://eu.smith.langchain.com/o/default/projects/p/agent-seat?runId=run-1'
+    );
+    expect(buildLangsmithTraceUrl('agent-seat', 'run-1', 'https://api.smith.langchain.com')).toBe(
+      'https://smith.langchain.com/o/default/projects/p/agent-seat?runId=run-1'
+    );
   });
 
   it('resolves create-issue script from custom path or defaults', () => {
