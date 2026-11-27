@@ -20,15 +20,17 @@ export function loadState(stateFilePath: string): HarvestState;
 export function saveState(stateFilePath: string, state: HarvestState): void;
 export function formatErrorSummary(rawError: unknown): string;
 export function buildLangsmithTraceUrl(projectName: string, runId: string, endpoint?: string): string;
-export function fetchFailedRuns(options: {
+export function fetchFailedRuns(options?: {
   project?: string;
   limit?: number;
   sinceHours?: number;
   mockFile?: string | null;
+  client?: unknown;
 }): Promise<any[]>;
 export function reportFrictionIssue(options: {
   run: any;
   repo: string;
+  project?: string;
   dryRun?: boolean;
   createIssueScript?: string | null;
 }): boolean;

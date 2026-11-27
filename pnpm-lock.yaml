@@ -15,8 +15,8 @@ importers:
         specifier: ^4.13.8
         version: 4.13.14
       langsmith:
-        specifier: ^0.13.1
-        version: 0.13.1(ws@8.23.0)
+        specifier: 0.14.0
+        version: 0.14.0(ws@8.23.0)
     devDependencies:
       '@types/node':
         specifier: ^24.1.0
@@ -381,8 +381,8 @@ packages:
     resolution: {integrity: sha512-yhRLQ21U6qa9Hsu2N7Qcbh8tE+WKEcoErjIo56LeSGiGXGp9sA7UpE86Ui9uexb61KakiGwuHMn2QdV7w6i6kQ==}
     engines: {node: '>=16.9.0'}
 
-  langsmith@0.13.1:
-    resolution: {integrity: sha512-9MIiVbmyFI0f1VVNp5eYVrsQGVKa/w+Rc1LvX/q5ooH73SdppTaK010pWXGxK6cxbzxX+3AaCzSPJ+QsxZGckA==}
+  langsmith@0.14.0:
+    resolution: {integrity: sha512-GpOpjx2rfsfKD6A4nnWfG9kxYbLlx9//catR1eCUwW/nMQxj4Mq2OQL7NJO9MQ5ZcGnvgsnUZdxBZLd2JJC1qA==}
     peerDependencies:
       '@opentelemetry/api': '*'
       '@opentelemetry/exporter-trace-otlp-proto': '*'
@@ -868,7 +868,7 @@ snapshots:
 
   hono@4.13.14: {}
 
-  langsmith@0.13.1(ws@8.23.0):
+  langsmith@0.14.0(ws@8.23.0):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:

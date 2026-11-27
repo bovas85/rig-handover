@@ -20,7 +20,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.0",
     "hono": "^4.13.8",
-    "langsmith": "^0.13.1"
+    "langsmith": "0.14.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

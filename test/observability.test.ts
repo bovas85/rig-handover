@@ -4,9 +4,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildLangsmithTraceUrl,
+  fetchFailedRuns,
   formatErrorSummary,
   loadState,
   parseArgs,
+  reportFrictionIssue,
   resolveCreateIssueScript,
   runHarvest,
   saveState,
@@ -140,5 +142,71 @@ process.exit(0);
 
     expect(res.ok).toBe(true);
     expect(res.filedCount).toBe(1);
+  });
+
+  it('caps fetched runs at limit when client.runs.query yields multiple pages', async () => {
+    const fakeClient = {
+      async readProject({ projectName }: { projectName: string }) {
+        return { id: `proj-${projectName}` };
+      },
+      runs: {
+        async *query(params: any) {
+          expect(params.project_ids).toEqual(['proj-custom-proj']);
+          expect(params.has_error).toBe(true);
+          expect(params.page_size).toBe(2);
+          yield { id: 'run-1', name: 'r1', error: 'err1' };
+          yield { id: 'run-2', name: 'r2', error: 'err2' };
+          yield { id: 'run-3', name: 'r3', error: 'err3' };
+        },
+      },
+    };
+
+    const runs = await fetchFailedRuns({
+      project: 'custom-proj',
+      limit: 2,
+      sinceHours: 12,
+      client: fakeClient,
+    });
+
+    expect(runs.map((r) => r.id)).toEqual(['run-1', 'run-2']);
+  });
+
+  it('uses the configured project name in trace URLs when v2 runs omit session_name', () => {
+    const prevEndpoint = process.env.LANGSMITH_ENDPOINT;
+    process.env.LANGSMITH_ENDPOINT = 'https://eu.api.smith.langchain.com';
+    const captureScript = path.join(tmpDir, 'capture-args.mjs');
+    const argsOut = path.join(tmpDir, 'captured.json');
+    fs.writeFileSync(
+      captureScript,
+      `#!/usr/bin/env node
+import fs from 'node:fs';
+fs.writeFileSync(${JSON.stringify(argsOut)}, JSON.stringify(process.argv.slice(2)));
+`,
+      'utf8'
+    );
+
+    try {
+      const ok = reportFrictionIssue({
+        run: { id: 'v2-run-1', name: 'step-a', error: 'boom' },
+        repo: 'bovas85/rig-handover',
+        project: 'custom-project',
+        dryRun: true,
+        createIssueScript: captureScript,
+      });
+
+      expect(ok).toBe(true);
+      const passedArgs: string[] = JSON.parse(fs.readFileSync(argsOut, 'utf8'));
+      const sourceThreadIdx = passedArgs.indexOf('--source-thread');
+      expect(sourceThreadIdx).toBeGreaterThan(-1);
+      expect(passedArgs[sourceThreadIdx + 1]).toBe(
+        'https://eu.smith.langchain.com/o/default/projects/p/custom-project?runId=v2-run-1'
+      );
+    } finally {
+      if (prevEndpoint === undefined) {
+        delete process.env.LANGSMITH_ENDPOINT;
+      } else {
+        process.env.LANGSMITH_ENDPOINT = prevEndpoint;
+      }
+    }
   });
 });
