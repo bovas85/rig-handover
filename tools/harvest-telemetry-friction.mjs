@@ -122,25 +122,29 @@ export function formatErrorSummary(rawError) {
   return String(rawError).slice(0, 100);
 }
 
-export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) {
+export async function fetchFailedRuns({ project = 'agent-seat', limit = 20, sinceHours = 24, mockFile, client: injectedClient } = {}) {
   if (mockFile) {
     if (!fs.existsSync(mockFile)) {
       throw new Error(`Mock file not found: ${mockFile}`);
     }
     const content = fs.readFileSync(mockFile, 'utf8');
     const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : (parsed.runs || []);
+    const mockRuns = Array.isArray(parsed) ? parsed : (parsed.runs || []);
+    return mockRuns.slice(0, limit);
   }
 
-  const apiKey = process.env.LANGSMITH_API_KEY;
-  if (!apiKey) {
-    console.log('[telemetry-friction] LANGSMITH_API_KEY is not configured. Skipping remote fetch.');
-    return [];
-  }
+  let client = injectedClient;
+  if (!client) {
+    const apiKey = process.env.LANGSMITH_API_KEY;
+    if (!apiKey) {
+      console.log('[telemetry-friction] LANGSMITH_API_KEY is not configured. Skipping remote fetch.');
+      return [];
+    }
 
-  const { Client } = await import('langsmith');
-  const apiUrl = process.env.LANGSMITH_ENDPOINT?.trim() || undefined;
-  const client = new Client({ apiKey, ...(apiUrl ? { apiUrl } : {}) });
+    const { Client } = await import('langsmith');
+    const apiUrl = process.env.LANGSMITH_ENDPOINT?.trim() || undefined;
+    client = new Client({ apiKey, ...(apiUrl ? { apiUrl } : {}) });
+  }
   const startTime = new Date(Date.now() - sinceHours * 3600 * 1000);
 
   let projectIds;
@@ -163,16 +167,21 @@ export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) 
     return [];
   }
 
+  const maxRuns = Math.max(1, Number(limit) || 20);
+  const pageSize = Math.min(maxRuns, 1000);
   const runs = [];
   try {
     for await (const run of client.runs.query({
       project_ids: projectIds,
       has_error: true,
       min_start_time: startTime.toISOString(),
-      page_size: limit,
+      page_size: pageSize,
       selects: ['ID', 'NAME', 'RUN_TYPE', 'STATUS', 'START_TIME', 'INPUTS', 'OUTPUTS', 'ERROR', 'EXTRA'],
     })) {
       runs.push(run);
+      if (runs.length >= maxRuns) {
+        break;
+      }
     }
   } catch (err) {
     console.error(`[telemetry-friction] Failed to query LangSmith runs: ${err.message}`);
@@ -187,14 +196,15 @@ export function buildLangsmithTraceUrl(projectName, runId, endpoint = process.en
   return `${uiOrigin}/o/default/projects/p/${encodeURIComponent(projectName || 'agent-seat')}?runId=${runId}`;
 }
 
-export function reportFrictionIssue({ run, repo, dryRun, createIssueScript }) {
+export function reportFrictionIssue({ run, repo, project, dryRun, createIssueScript }) {
   const runId = run.id || `mock-${Date.now()}`;
   const runName = run.name || 'agent-run';
   const errSummary = formatErrorSummary(run.error);
   const title = `fix(telemetry): ${runName} - ${errSummary}`.slice(0, 90);
 
   const errorDetail = typeof run.error === 'string' ? run.error : JSON.stringify(run.error, null, 2);
-  const langsmithUrl = buildLangsmithTraceUrl(run.session_name || 'agent-seat', runId);
+  const projectName = project || run.session_name || 'agent-seat';
+  const langsmithUrl = buildLangsmithTraceUrl(projectName, runId);
 
   const desc = `LangSmith telemetry detected an execution error in run \`${runName}\` (${runId}).\n\n### Error Details\n\`\`\`\n${errorDetail.slice(
     0,
@@ -272,6 +282,7 @@ export async function runHarvest(options = {}) {
     const ok = reportFrictionIssue({
       run,
       repo: targetRepo,
+      project: opts.project,
       dryRun: opts.dryRun,
       createIssueScript: opts.createIssueScript,
     });
