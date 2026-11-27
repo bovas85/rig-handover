@@ -19,6 +19,7 @@ export function parseArgs(argv?: string[]): HarvestArgs;
 export function loadState(stateFilePath: string): HarvestState;
 export function saveState(stateFilePath: string, state: HarvestState): void;
 export function formatErrorSummary(rawError: unknown): string;
+export function buildLangsmithTraceUrl(projectName: string, runId: string, endpoint?: string): string;
 export function fetchFailedRuns(options: {
   project?: string;
   limit?: number;

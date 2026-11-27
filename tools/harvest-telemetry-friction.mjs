@@ -139,7 +139,8 @@ export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) 
   }
 
   const { Client } = await import('langsmith');
-  const client = new Client({ apiKey });
+  const apiUrl = process.env.LANGSMITH_ENDPOINT?.trim() || undefined;
+  const client = new Client({ apiKey, ...(apiUrl ? { apiUrl } : {}) });
   const startTime = new Date(Date.now() - sinceHours * 3600 * 1000);
 
   let projectIds;
@@ -180,6 +181,12 @@ export async function fetchFailedRuns({ project, limit, sinceHours, mockFile }) 
   return runs;
 }
 
+export function buildLangsmithTraceUrl(projectName, runId, endpoint = process.env.LANGSMITH_ENDPOINT) {
+  const isEu = String(endpoint || '').toLowerCase().includes('eu.api.smith.langchain.com');
+  const uiOrigin = isEu ? 'https://eu.smith.langchain.com' : 'https://smith.langchain.com';
+  return `${uiOrigin}/o/default/projects/p/${encodeURIComponent(projectName || 'agent-seat')}?runId=${runId}`;
+}
+
 export function reportFrictionIssue({ run, repo, dryRun, createIssueScript }) {
   const runId = run.id || `mock-${Date.now()}`;
   const runName = run.name || 'agent-run';
@@ -187,9 +194,7 @@ export function reportFrictionIssue({ run, repo, dryRun, createIssueScript }) {
   const title = `fix(telemetry): ${runName} - ${errSummary}`.slice(0, 90);
 
   const errorDetail = typeof run.error === 'string' ? run.error : JSON.stringify(run.error, null, 2);
-  const langsmithUrl = `https://smith.langchain.com/o/default/projects/p/${encodeURIComponent(
-    run.session_name || 'agent-seat'
-  )}?runId=${runId}`;
+  const langsmithUrl = buildLangsmithTraceUrl(run.session_name || 'agent-seat', runId);
 
   const desc = `LangSmith telemetry detected an execution error in run \`${runName}\` (${runId}).\n\n### Error Details\n\`\`\`\n${errorDetail.slice(
     0,
